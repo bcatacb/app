@@ -249,19 +249,21 @@ const Dashboard = () => {
 
                 <Button
                   onClick={handleUpload}
-                  disabled={!selectedFile || analyzing}
+                  disabled={selectedFiles.length === 0 || analyzing}
                   className="w-full bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white font-medium shadow-lg shadow-violet-500/20"
                   data-testid="analyze-button"
                 >
                   {analyzing ? (
-                    <span className="flex items-center gap-2">
-                      <Activity className="w-4 h-4 animate-pulse" />
-                      Analyzing...
+                    <span className="flex flex-col items-center gap-1 w-full">
+                      <span className="flex items-center gap-2">
+                        <Activity className="w-4 h-4 animate-pulse" />
+                        Analyzing {selectedFiles.length} file{selectedFiles.length > 1 ? 's' : ''}...
+                      </span>
                     </span>
                   ) : (
                     <span className="flex items-center gap-2">
                       <Activity className="w-4 h-4" />
-                      Analyze Audio
+                      Analyze {selectedFiles.length > 0 ? `${selectedFiles.length} ` : ''}Audio
                     </span>
                   )}
                 </Button>
