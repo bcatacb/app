@@ -18,16 +18,22 @@ const API = `${BACKEND_URL}/api`;
 
 const Dashboard = () => {
   const [tracks, setTracks] = useState([]);
+  const [filteredTracks, setFilteredTracks] = useState([]);
   const [stats, setStats] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [useYamnet, setUseYamnet] = useState(true);
   const [useOpenl3, setUseOpenl3] = useState(true);
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
+  const [viewMode, setViewMode] = useState('grid'); // 'grid', 'list', 'table'
+  const [showFilters, setShowFilters] = useState(false);
   const [searchFilters, setSearchFilters] = useState({
     min_bpm: '',
     max_bpm: '',
     key: '',
+    mood: '',
+    instrument: '',
+    filename: '',
   });
   const fileInputRef = useRef(null);
 
