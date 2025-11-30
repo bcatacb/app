@@ -209,15 +209,9 @@ def detect_mood(audio_path: str) -> List[str]:
         logging.error(f"Error detecting mood: {e}")
         return ["neutral"]
 
-# API Routes
-@api_router.post("/analyze", response_model=TrackMetadata)
-async def analyze_audio(
-    file: UploadFile = File(...),
-    use_yamnet: bool = Query(True),
-    use_openl3: bool = Query(True)
-):
-    """Upload and analyze audio file"""
-    # Validate file type
+# Helper function for single file analysis
+async def analyze_single_file(file: UploadFile, use_yamnet: bool, use_openl3: bool) -> TrackMetadata:
+    """Analyze a single audio file"""
     allowed_extensions = ['.wav', '.mp3', '.flac', '.m4a', '.ogg']
     file_ext = Path(file.filename).suffix.lower()
     
@@ -269,6 +263,50 @@ async def analyze_audio(
             os.unlink(tmp_path)
         except:
             pass
+
+# API Routes
+@api_router.post("/analyze", response_model=TrackMetadata)
+async def analyze_audio(
+    file: UploadFile = File(...),
+    use_yamnet: bool = Query(True),
+    use_openl3: bool = Query(True)
+):
+    """Upload and analyze single audio file"""
+    return await analyze_single_file(file, use_yamnet, use_openl3)
+
+@api_router.post("/analyze-batch")
+async def analyze_batch(
+    files: List[UploadFile] = File(...),
+    use_yamnet: bool = Query(True),
+    use_openl3: bool = Query(True)
+):
+    """Upload and analyze multiple audio files"""
+    results = []
+    errors = []
+    
+    for file in files:
+        try:
+            metadata = await analyze_single_file(file, use_yamnet, use_openl3)
+            results.append({
+                "filename": file.filename,
+                "status": "success",
+                "metadata": metadata.model_dump()
+            })
+        except Exception as e:
+            logging.error(f"Error analyzing {file.filename}: {e}")
+            errors.append({
+                "filename": file.filename,
+                "status": "error",
+                "error": str(e)
+            })
+    
+    return {
+        "total": len(files),
+        "successful": len(results),
+        "failed": len(errors),
+        "results": results,
+        "errors": errors
+    }
 
 @api_router.get("/tracks", response_model=List[TrackMetadata])
 async def get_tracks():
