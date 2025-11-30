@@ -20,9 +20,10 @@ const Dashboard = () => {
   const [tracks, setTracks] = useState([]);
   const [stats, setStats] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState([]);
   const [useYamnet, setUseYamnet] = useState(true);
   const [useOpenl3, setUseOpenl3] = useState(true);
+  const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
   const [searchFilters, setSearchFilters] = useState({
     min_bpm: '',
     max_bpm: '',
