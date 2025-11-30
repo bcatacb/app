@@ -42,6 +42,10 @@ const Dashboard = () => {
     fetchStats();
   }, []);
 
+  useEffect(() => {
+    applyFilters();
+  }, [tracks, searchFilters]);
+
   const fetchTracks = async () => {
     try {
       const response = await axios.get(`${API}/tracks`);
