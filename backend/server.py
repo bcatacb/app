@@ -1,7 +1,10 @@
-from fastapi import FastAPI, APIRouter, UploadFile, File, HTTPException, Query
+from fastapi import FastAPI, APIRouter, UploadFile, File, HTTPException, Query, Depends, status
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.middleware.cors import CORSMiddleware
+from jose import JWTError, jwt
+from passlib.context import CryptContext
 from dotenv import load_dotenv
-from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
@@ -9,7 +12,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import tempfile
 import shutil
 
@@ -22,6 +25,14 @@ from scipy.stats import mode
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
+
+# Authentication
+SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'your-secret-key-change-in-production')
+ALGORITHM = 'HS256'
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+security = HTTPBearer()
+pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -79,6 +90,26 @@ class SearchFilters(BaseModel):
     key: Optional[str] = None
     instruments: Optional[List[str]] = None
     mood_tags: Optional[List[str]] = None
+
+class User(BaseModel):
+    username: str
+    email: str
+    disabled: bool = False
+
+class UserInDB(User):
+    hashed_password: str
+
+class UserCreate(BaseModel):
+    username: str
+    email: str
+    password: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
 
 # Audio Analysis Functions
 def detect_bpm(audio_path: str) -> float:
@@ -247,11 +278,6 @@ async def analyze_single_file(file: UploadFile, use_yamnet: bool, use_openl3: bo
             format=file_ext.lstrip('.')
         )
         
-        # Store in database
-        doc = metadata.model_dump()
-        doc['analyzed_at'] = doc['analyzed_at'].isoformat()
-        await db.tracks.insert_one(doc)
-        
         return metadata
         
     except Exception as e:
@@ -264,21 +290,133 @@ async def analyze_single_file(file: UploadFile, use_yamnet: bool, use_openl3: bo
         except:
             pass
 
+# Authentication Helper Functions
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify a password against its hash"""
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password: str) -> str:
+    """Hash a password"""
+    return pwd_context.hash(password)
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    """Create JWT access token"""
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Get current authenticated user"""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        token_data = TokenData(username=username)
+    except JWTError:
+        raise credentials_exception
+    
+    user = await db.users.find_one({"username": token_data.username})
+    if user is None:
+        raise credentials_exception
+    
+    return UserInDB(**user)
+
+async def get_current_active_user(current_user: UserInDB = Depends(get_current_user)):
+    """Get current active user"""
+    if current_user.disabled:
+        raise HTTPException(status_code=400, detail="Inactive user")
+    return current_user
+
+# Authentication Routes
+@api_router.post("/register", response_model=User)
+async def register_user(user: UserCreate):
+    """Register a new user"""
+    # Check if user already exists
+    existing_user = await db.users.find_one({"username": user.username})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Username already registered")
+    
+    existing_email = await db.users.find_one({"email": user.email})
+    if existing_email:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Create new user
+    hashed_password = get_password_hash(user.password)
+    user_in_db = UserInDB(
+        username=user.username,
+        email=user.email,
+        hashed_password=hashed_password,
+        disabled=False
+    )
+    
+    await db.users.insert_one(user_in_db.model_dump())
+    return User(username=user.username, email=user.email, disabled=False)
+
+@api_router.post("/login", response_model=Token)
+async def login_user(form_data: dict):
+    """Login user and return access token"""
+    username = form_data.get("username")
+    password = form_data.get("password")
+    
+    if not username or not password:
+        raise HTTPException(status_code=400, detail="Username and password required")
+    
+    user = await db.users.find_one({"username": username})
+    if not user or not verify_password(password, user["hashed_password"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user["username"]}, expires_delta=access_token_expires
+    )
+    
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@api_router.get("/me", response_model=User)
+async def read_users_me(current_user: UserInDB = Depends(get_current_active_user)):
+    """Get current user info"""
+    return User(username=current_user.username, email=current_user.email, disabled=current_user.disabled)
+
 # API Routes
 @api_router.post("/analyze", response_model=TrackMetadata)
 async def analyze_audio(
     file: UploadFile = File(...),
     use_yamnet: bool = Query(True),
-    use_openl3: bool = Query(True)
+    use_openl3: bool = Query(True),
+    current_user: UserInDB = Depends(get_current_active_user)
 ):
     """Upload and analyze single audio file"""
-    return await analyze_single_file(file, use_yamnet, use_openl3)
+    metadata = await analyze_single_file(file, use_yamnet, use_openl3)
+    
+    # Store in database with user association
+    doc = metadata.model_dump()
+    doc['analyzed_at'] = doc['analyzed_at'].isoformat()
+    doc['user_id'] = current_user.username
+    await db.tracks.insert_one(doc)
+    
+    return metadata
 
 @api_router.post("/analyze-batch")
 async def analyze_batch(
     files: List[UploadFile] = File(...),
     use_yamnet: bool = Query(True),
-    use_openl3: bool = Query(True)
+    use_openl3: bool = Query(True),
+    current_user: UserInDB = Depends(get_current_active_user)
 ):
     """Upload and analyze multiple audio files"""
     results = []
@@ -287,6 +425,13 @@ async def analyze_batch(
     for file in files:
         try:
             metadata = await analyze_single_file(file, use_yamnet, use_openl3)
+            
+            # Store in database with user association
+            doc = metadata.model_dump()
+            doc['analyzed_at'] = doc['analyzed_at'].isoformat()
+            doc['user_id'] = current_user.username
+            await db.tracks.insert_one(doc)
+            
             results.append({
                 "filename": file.filename,
                 "status": "success",
@@ -309,9 +454,9 @@ async def analyze_batch(
     }
 
 @api_router.get("/tracks", response_model=List[TrackMetadata])
-async def get_tracks():
+async def get_tracks(current_user: UserInDB = Depends(get_current_active_user)):
     """Get all analyzed tracks"""
-    tracks = await db.tracks.find({}, {"_id": 0}).to_list(1000)
+    tracks = await db.tracks.find({"user_id": current_user.username}, {"_id": 0}).to_list(1000)
     
     # Convert ISO string timestamps back to datetime objects
     for track in tracks:

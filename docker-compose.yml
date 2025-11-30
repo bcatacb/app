@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7
+    container_name: beat-analyzer-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-password123}
+      MONGO_INITDB_DATABASE: ${DB_NAME:-beat_analyzer}
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    ports:
+      - "27017:27017"
+    networks:
+      - beat-analyzer-network
+
+  # Backend API
+  backend:
+    build: .
+    container_name: beat-analyzer-backend
+    restart: unless-stopped
+    environment:
+      MONGO_URL: mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD:-password123}@mongodb:27017
+      DB_NAME: ${DB_NAME:-beat_analyzer}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,https://yourdomain.com}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-super-secret-jwt-key-change-in-production}
+      FILE_STORAGE_PATH: /app/uploads
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-100MB}
+    volumes:
+      - uploads_data:/app/uploads
+      - ./logs:/app/logs
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mongodb
+    networks:
+      - beat-analyzer-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/tracks"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: beat-analyzer-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - uploads_data:/var/www/uploads:ro
+    depends_on:
+      - backend
+    networks:
+      - beat-analyzer-network
+
+volumes:
+  mongodb_data:
+    driver: local
+  uploads_data:
+    driver: local
+
+networks:
+  beat-analyzer-network:
+    driver: bridge
