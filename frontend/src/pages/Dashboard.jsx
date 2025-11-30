@@ -56,43 +56,78 @@ const Dashboard = () => {
   };
 
   const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      setSelectedFiles(files);
     }
   };
 
   const handleUpload = async () => {
-    if (!selectedFile) {
-      toast.error('Please select a file');
+    if (selectedFiles.length === 0) {
+      toast.error('Please select at least one file');
       return;
     }
 
     setAnalyzing(true);
-    const formData = new FormData();
-    formData.append('file', selectedFile);
+    setBatchProgress({ current: 0, total: selectedFiles.length });
 
     try {
-      const response = await axios.post(
-        `${API}/analyze?use_yamnet=${useYamnet}&use_openl3=${useOpenl3}`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        }
-      );
+      if (selectedFiles.length === 1) {
+        // Single file upload
+        const formData = new FormData();
+        formData.append('file', selectedFiles[0]);
 
-      toast.success(`Analysis complete: ${response.data.filename}`);
-      setSelectedFile(null);
+        const response = await axios.post(
+          `${API}/analyze?use_yamnet=${useYamnet}&use_openl3=${useOpenl3}`,
+          formData,
+          {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          }
+        );
+
+        toast.success(`Analysis complete: ${response.data.filename}`);
+      } else {
+        // Batch upload
+        const formData = new FormData();
+        selectedFiles.forEach(file => {
+          formData.append('files', file);
+        });
+
+        const response = await axios.post(
+          `${API}/analyze-batch?use_yamnet=${useYamnet}&use_openl3=${useOpenl3}`,
+          formData,
+          {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          }
+        );
+
+        const { successful, failed, errors } = response.data;
+        
+        if (successful > 0) {
+          toast.success(`Successfully analyzed ${successful} file${successful > 1 ? 's' : ''}`);
+        }
+        
+        if (failed > 0) {
+          errors.forEach(err => {
+            toast.error(`Failed: ${err.filename} - ${err.error}`);
+          });
+        }
+      }
+
+      setSelectedFiles([]);
       if (fileInputRef.current) fileInputRef.current.value = '';
       fetchTracks();
       fetchStats();
     } catch (error) {
-      console.error('Error analyzing file:', error);
-      toast.error('Failed to analyze audio file');
+      console.error('Error analyzing files:', error);
+      toast.error('Failed to analyze audio files');
     } finally {
       setAnalyzing(false);
+      setBatchProgress({ current: 0, total: 0 });
     }
   };
 
