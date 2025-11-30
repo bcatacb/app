@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { Upload, Music, Search, Trash2, Activity, BarChart3, Clock } from 'lucide-react';
+import { Upload, Music, Search, Trash2, Activity, BarChart3, Clock, Grid3x3, List, Table, Filter, SlidersHorizontal, TrendingUp, Disc3 } from 'lucide-react';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
