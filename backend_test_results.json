@@ -1,0 +1,76 @@
+{
+  "summary": {
+    "total_tests": 11,
+    "passed_tests": 11,
+    "success_rate": 100.0,
+    "timestamp": "2025-11-30T00:10:13.596332"
+  },
+  "detailed_results": [
+    {
+      "test_name": "API Health Check",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-11-30T00:09:53.458036"
+    },
+    {
+      "test_name": "Get Tracks (Empty)",
+      "success": true,
+      "details": "Returned 0 tracks",
+      "timestamp": "2025-11-30T00:09:53.497719"
+    },
+    {
+      "test_name": "Get Stats",
+      "success": true,
+      "details": "Stats: {'total_tracks': 0, 'avg_bpm': 0, 'common_keys': [], 'common_moods': [], 'total_duration': 0}",
+      "timestamp": "2025-11-30T00:09:53.540500"
+    },
+    {
+      "test_name": "Search Empty Filters",
+      "success": true,
+      "details": "Returned 0 tracks",
+      "timestamp": "2025-11-30T00:09:53.580428"
+    },
+    {
+      "test_name": "Search With BPM Filters",
+      "success": true,
+      "details": "Returned 0 tracks",
+      "timestamp": "2025-11-30T00:09:53.621222"
+    },
+    {
+      "test_name": "Analyze Without File",
+      "success": true,
+      "details": "Status: 422",
+      "timestamp": "2025-11-30T00:09:53.666915"
+    },
+    {
+      "test_name": "Get Nonexistent Track",
+      "success": true,
+      "details": "Status: 404",
+      "timestamp": "2025-11-30T00:09:53.703059"
+    },
+    {
+      "test_name": "Delete Nonexistent Track",
+      "success": true,
+      "details": "Status: 404",
+      "timestamp": "2025-11-30T00:09:53.747795"
+    },
+    {
+      "test_name": "Analyze With Test File",
+      "success": true,
+      "details": "BPM: 0.0, Key: A minor, Instruments: 0",
+      "timestamp": "2025-11-30T00:10:13.499755"
+    },
+    {
+      "test_name": "Get Created Track",
+      "success": true,
+      "details": "Retrieved track: test_audio.wav",
+      "timestamp": "2025-11-30T00:10:13.557600"
+    },
+    {
+      "test_name": "Delete Created Track",
+      "success": true,
+      "details": "Track deleted successfully",
+      "timestamp": "2025-11-30T00:10:13.595379"
+    }
+  ]
+}
