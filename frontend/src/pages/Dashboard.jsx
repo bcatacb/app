@@ -153,24 +153,57 @@ const Dashboard = () => {
     }
   };
 
-  const handleSearch = async () => {
-    try {
-      const filters = {};
-      if (searchFilters.min_bpm) filters.min_bpm = parseFloat(searchFilters.min_bpm);
-      if (searchFilters.max_bpm) filters.max_bpm = parseFloat(searchFilters.max_bpm);
-      if (searchFilters.key) filters.key = searchFilters.key;
+  const applyFilters = () => {
+    let filtered = [...tracks];
 
-      const response = await axios.post(`${API}/search`, filters);
-      setTracks(response.data);
-    } catch (error) {
-      console.error('Error searching tracks:', error);
-      toast.error('Search failed');
+    // Filename filter
+    if (searchFilters.filename) {
+      filtered = filtered.filter(track => 
+        track.filename.toLowerCase().includes(searchFilters.filename.toLowerCase())
+      );
     }
+
+    // BPM filters
+    if (searchFilters.min_bpm) {
+      filtered = filtered.filter(track => track.bpm >= parseFloat(searchFilters.min_bpm));
+    }
+    if (searchFilters.max_bpm) {
+      filtered = filtered.filter(track => track.bpm <= parseFloat(searchFilters.max_bpm));
+    }
+
+    // Key filter
+    if (searchFilters.key) {
+      filtered = filtered.filter(track => 
+        track.key.toLowerCase().includes(searchFilters.key.toLowerCase())
+      );
+    }
+
+    // Mood filter
+    if (searchFilters.mood) {
+      filtered = filtered.filter(track => 
+        track.mood_tags.some(mood => mood.toLowerCase().includes(searchFilters.mood.toLowerCase()))
+      );
+    }
+
+    // Instrument filter
+    if (searchFilters.instrument) {
+      filtered = filtered.filter(track => 
+        track.instruments.some(inst => inst.name.toLowerCase().includes(searchFilters.instrument.toLowerCase()))
+      );
+    }
+
+    setFilteredTracks(filtered);
   };
 
   const clearSearch = () => {
-    setSearchFilters({ min_bpm: '', max_bpm: '', key: '' });
-    fetchTracks();
+    setSearchFilters({ 
+      min_bpm: '', 
+      max_bpm: '', 
+      key: '',
+      mood: '',
+      instrument: '',
+      filename: ''
+    });
   };
 
   const formatDuration = (seconds) => {
