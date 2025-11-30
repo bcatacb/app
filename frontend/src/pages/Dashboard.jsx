@@ -202,18 +202,26 @@ const Dashboard = () => {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="file-upload" className="text-slate-300">Audio File</Label>
+                  <Label htmlFor="file-upload" className="text-slate-300">Audio Files (multiple supported)</Label>
                   <Input
                     id="file-upload"
                     type="file"
                     accept=".wav,.mp3,.flac,.m4a,.ogg"
                     onChange={handleFileChange}
                     ref={fileInputRef}
+                    multiple
                     className="bg-slate-800/50 border-slate-700 text-slate-300 file:bg-violet-500/10 file:text-violet-400 file:border-0 file:mr-4 file:py-2 file:px-4 file:rounded-lg"
                     data-testid="file-input"
                   />
-                  {selectedFile && (
-                    <p className="text-xs text-slate-400">Selected: {selectedFile.name}</p>
+                  {selectedFiles.length > 0 && (
+                    <div className="text-xs text-slate-400 space-y-1">
+                      <p className="font-medium text-violet-400">{selectedFiles.length} file{selectedFiles.length > 1 ? 's' : ''} selected:</p>
+                      <div className="max-h-20 overflow-y-auto space-y-0.5">
+                        {selectedFiles.map((file, idx) => (
+                          <p key={idx} className="text-slate-500">• {file.name}</p>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
 
